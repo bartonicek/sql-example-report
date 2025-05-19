@@ -1,0 +1,192 @@
+---
+title: "Report"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Create connection and load in the data
+
+```{r}
+library(duckdb)
+library(nycflights23)
+
+# Create a temporary in-memory duckdb instance
+conn <- dbConnect(duckdb())
+dbWriteTable(conn, "flights", data.frame(nycflights23::flights))
+dbWriteTable(conn, "airports", data.frame(nycflights23::airports))
+```
+
+```{r}
+# Print first 5 rows of flights
+knitr::kable(dbGetQuery(conn, "SELECT * FROM flights LIMIT 5;"))
+```
+
+## Some basic summary statistics
+
+### Number of recorded flights
+
+```{r}
+knitr::kable(dbGetQuery(conn, "SELECT COUNT(*) FROM flights"))
+```
+
+### Five most popular routes
+
+```{r}
+query <- "
+  SELECT origin, dest, COUNT(*) as count 
+  FROM flights 
+  GROUP BY origin, dest
+  ORDER BY -count
+  LIMIT 5"
+
+knitr::kable(dbGetQuery(conn, query))
+```
+
+### Carriers with longest departure and arrival delays
+
+```{r}
+query <- "
+  SELECT carrier, AVG(dep_delay) as avg_dep_delay
+  FROM flights 
+  GROUP BY carrier
+  ORDER BY -avg_dep_delay
+  LIMIT 3"
+
+knitr::kable(dbGetQuery(conn, query))
+
+query <- "
+  SELECT carrier, AVG(arr_delay) as avg_arr_delay 
+  FROM flights 
+  GROUP BY carrier
+  ORDER BY -avg_arr_delay
+  LIMIT 3"
+
+knitr::kable(dbGetQuery(conn, query))
+```
+
+## Create a table of (approximate) distances between airports
+
+I wanted to investigate the relationship between the distance between the origin and destination airports and the flight's departure delay. To do this, I could have used the `distance` column in the `flights` table, however, to have some more fun with SQL table joins, I decided to compute an approximate distance myself, using the data in the `airports` table.
+
+I created a table with approximate flight distances by cross-joining the airports table on itself and computing the Euclidean distances between points at given latitude and longitude:
+
+```{r}
+query <- "CREATE TABLE distances AS
+            SELECT 
+              a.faa as origin, 
+              b.faa as dest,
+              a.name as origin_name,
+              b.name as dest_name,
+              SQRT((a.lat - b.lat) ** 2 + (a.lon - b.lon) ** 2) as dist,
+            FROM airports a
+            CROSS JOIN airports b
+            WHERE dist > 0"
+
+dbExecute(conn, query)
+```
+
+(Euclidean distance between two latitude-longitude points is only approximate, since it does not take into account Earth's curvature. However, since all airports are in the US the approximation should be decent. If we wanted more precision, we could use e.g. the [Haversine distance formula](https://en.wikipedia.org/wiki/Haversine_formula))
+
+### Check if computed distance matches distance in data
+
+I checked the computed distance (`dist`) against the distance given in the `flights` table:
+
+```{r}
+
+query <- "
+  SELECT distance, dist 
+  FROM flights a
+  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest
+  "
+
+distance_df <- dbGetQuery(conn, query)
+
+library(ggplot2)
+theme_set(theme_bw() + theme(panel.grid = element_blank()))
+
+ggplot(distance_df, aes(dist, distance)) +
+  geom_point(alpha = 0.5) +
+  labs(x = "Computed distance", y = "Provided distance (flights data set)")
+```
+
+My computed distance seemd to match the given distance fairly closely, although there were some deviations. These could be attributable curvature, to the flights' deviation from straight-line path, or other factors. 
+
+### Print the top 5 longest flight paths
+
+```{r}
+knitr::kable(dbGetQuery(conn, "SELECT * FROM distances ORDER BY -dist LIMIT 5"))
+```
+
+### Print the top 5 shortest flight paths
+
+```{r}
+knitr::kable(dbGetQuery(conn, "SELECT * FROM distances ORDER BY dist LIMIT 5"))
+```
+
+### Relationship between average departure delay and flight path distance
+
+I wanted to investigate whether there was a relationship between average departure delay and (approximate) distance between the origin and destination airports. I obtained the appropriate data by running the following query: 
+
+```{r}
+query <- "
+  SELECT a.origin, a.dest, dist, count, avg_dep_delay 
+  FROM 
+    (SELECT origin, dest, COUNT(*) as count, AVG(dep_delay) as avg_dep_delay
+    FROM flights
+    GROUP BY origin, dest
+    ORDER BY -avg_dep_delay
+  ) a
+  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest
+"
+
+delay_by_distance <- dbGetQuery(conn, query)
+```
+
+To investigate the relationship between distance and average departure delay, I plotted the data as a scatterplot using the `ggplot` package. I also computed a custom smoothed weighted regression fit (using the number of flights as the weighting variable) and plotted that as well (the corresponding R code can be displayed by clicking the link below): 
+
+```{r}
+#| code-fold: true
+
+delay_by_distance$flight <- with(delay_by_distance, paste(origin, dest, sep = "-"))
+outlier1 <- subset(delay_by_distance, dist > 75 & avg_dep_delay > 25)
+outlier2 <- subset(delay_by_distance, avg_dep_delay > 55)
+outlier3 <- subset(delay_by_distance, dist > 75 & avg_dep_delay < 15)
+
+
+design_matrix <- function(x, knots, bandwidth) {
+  X <- outer(x, knots, '-')
+  X <- cbind(1, exp(- (X^2) / bandwidth ^ 2))
+  colnames(X) <- paste0("X", 1:ncol(X))
+  X
+}
+
+bwd <- 50
+n_knots <- 4
+dist <- delay_by_distance$dist
+knots <- seq(min(dist), max(dist), length = n_knots)
+
+X <- design_matrix(dist, knots, bwd)
+df <- cbind(subset(delay_by_distance, select = c("avg_dep_delay", "count")), X)
+fit <- lm(avg_dep_delay ~ . - 1, weights = count, data = df)
+
+new_dist <- seq(min(dist), max(dist), length = 100)
+new_X <- design_matrix(new_dist, knots, bwd)
+new_df <- cbind(data.frame(count = 1), new_X)
+
+preds <- predict(fit, newdata = new_df)
+pred_df <- data.frame(dist = new_dist, preds)
+
+ggplot(delay_by_distance, aes(dist, avg_dep_delay, label = flight)) +
+  geom_point(aes(size = count)) +
+  geom_line(data = pred_df, aes(y = preds, label = NULL), col = "steelblue") +
+  geom_text(data = outlier1, nudge_x = -1, hjust = 1) +
+  geom_text(data = outlier2, hjust = 1, nudge_x = -1) +
+  geom_text(data = outlier3, hjust = 1, nudge_x = -1) +
+  scale_size_continuous(range = c(0, 3)) +
+  labs(x = "Approximate distance", y = "Average departure delay",
+       title = "Short flights tended to have smaller delays")
+```
+
+There did seem to be a trend for flights to have longer delays as the distance between the origin and desitnation got larger, up to a certain point (about 25 degrees), after which the delays seem to start to decrease again. There were also few outliers. For instance, the flights between La Guardia Airport (LGA) and Eagle County Regional Airport (EGE) tended to have significantly longer average delays than would be expected. 
