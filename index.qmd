@@ -6,9 +6,15 @@ editor_options:
   chunk_output_type: console
 ---
 
+For my examples, I decided to use DuckDB. I picked this database because I wanted to write the report in Quarto (a markdown publishing system which has good integration with R) and DuckDB is a fast in-memory analytical database that also integrates well with R and uses a fairly standard SQL dialect similar to  PostgreSQL.
+
+As the data to explore, I picked the open-source `nycflights23` data set (included in the R package of the same name). Specifically I picked the `flights` and `airports` tables from this data set. The `flights` table contains `r nrow(nycflights23::flights)` rows with information about flights between various US airports, including their arrival and departure time, delays, etc... The `airports` table contains information about the airports, such as their latitude and longtitude, their full name, etc...
+
 ## Create connection and load in the data
 
 ```{r}
+#| message: false
+#| warning: false
 library(duckdb)
 library(nycflights23)
 
