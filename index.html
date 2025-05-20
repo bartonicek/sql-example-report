@@ -102,12 +102,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="create-connection-and-load-in-the-data">Create connection and load in the data</h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(duckdb)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nycflights23)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a temporary in-memory duckdb instance</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>conn <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(<span class="fu">duckdb</span>())</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">dbWriteTable</span>(conn, <span class="st">"flights"</span>, <span class="fu">data.frame</span>(nycflights23<span class="sc">::</span>flights))</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">dbWriteTable</span>(conn, <span class="st">"airports"</span>, <span class="fu">data.frame</span>(nycflights23<span class="sc">::</span>airports))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a temporary in-memory duckdb instance</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>conn <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(<span class="fu">duckdb</span>())</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">dbWriteTable</span>(conn, <span class="st">"flights"</span>, <span class="fu">data.frame</span>(nycflights23<span class="sc">::</span>flights))</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">dbWriteTable</span>(conn, <span class="st">"airports"</span>, <span class="fu">data.frame</span>(nycflights23<span class="sc">::</span>airports))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Print first 5 rows of flights</span></span>
@@ -412,23 +411,117 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 </section>
+<section id="shortest-flights-as-a-proportion-of-the-median-flight-for-a-given-flightpath-window-functions" class="level2">
+<h2 class="anchored" data-anchor-id="shortest-flights-as-a-proportion-of-the-median-flight-for-a-given-flightpath-window-functions">Shortest flights as a proportion of the median flight for a given flightpath (window functions)</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">  SELECT  flightpath,</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">          time,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">          MEDIAN(time) OVER (PARTITION BY flightpath) as median_time,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">          time / MEDIAN(time) OVER (PARTITION BY flightpath) as pct_time,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">  FROM (</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">        SELECT DISTINCT</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="st">                        hour * 60 + minute as time, </span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="st">                        CONCAT(origin, dest) as flightpath,</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="st">        FROM flights</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="st">        )</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="st">  ORDER BY pct_time</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="st">  LIMIT 10"</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">dbGetQuery</span>(conn, query))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">flightpath</th>
+<th style="text-align: right;">time</th>
+<th style="text-align: right;">median_time</th>
+<th style="text-align: right;">pct_time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">EWROAK</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">1040</td>
+<td style="text-align: right;">0.2884615</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">EWRSJU</td>
+<td style="text-align: right;">301</td>
+<td style="text-align: right;">1016</td>
+<td style="text-align: right;">0.2962598</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">EWRSJU</td>
+<td style="text-align: right;">305</td>
+<td style="text-align: right;">1016</td>
+<td style="text-align: right;">0.3001969</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">EWRLAX</td>
+<td style="text-align: right;">310</td>
+<td style="text-align: right;">940</td>
+<td style="text-align: right;">0.3297872</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">EWRCLT</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">908</td>
+<td style="text-align: right;">0.3303965</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">JFKLAX</td>
+<td style="text-align: right;">310</td>
+<td style="text-align: right;">934</td>
+<td style="text-align: right;">0.3319058</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">JFKBQN</td>
+<td style="text-align: right;">301</td>
+<td style="text-align: right;">897</td>
+<td style="text-align: right;">0.3355630</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">JFKFLL</td>
+<td style="text-align: right;">301</td>
+<td style="text-align: right;">885</td>
+<td style="text-align: right;">0.3401130</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">JFKBQN</td>
+<td style="text-align: right;">310</td>
+<td style="text-align: right;">897</td>
+<td style="text-align: right;">0.3455964</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">JFKSJU</td>
+<td style="text-align: right;">301</td>
+<td style="text-align: right;">870</td>
+<td style="text-align: right;">0.3459770</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
 <section id="create-a-table-of-approximate-distances-between-airports" class="level2">
 <h2 class="anchored" data-anchor-id="create-a-table-of-approximate-distances-between-airports">Create a table of (approximate) distances between airports</h2>
 <p>I wanted to investigate the relationship between the distance between the origin and destination airports and the flight’s departure delay. To do this, I could have used the <code>distance</code> column in the <code>flights</code> table, however, to have some more fun with SQL table joins, I decided to compute an approximate distance myself, using the data in the <code>airports</code> table.</p>
 <p>I created a table with approximate flight distances by cross-joining the airports table on itself and computing the Euclidean distances between points at given latitude and longitude:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"CREATE TABLE distances AS</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">            SELECT </span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">              a.faa as origin, </span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">              b.faa as dest,</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">              a.name as origin_name,</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">              b.name as dest_name,</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="st">              SQRT((a.lat - b.lat) ** 2 + (a.lon - b.lon) ** 2) as dist,</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM airports a</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="st">            CROSS JOIN airports b</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="st">            WHERE dist &gt; 0"</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(conn, query)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"CREATE TABLE distances AS</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="st">            SELECT </span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="st">              a.faa as origin, </span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="st">              b.faa as dest,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="st">              a.name as origin_name,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="st">              b.name as dest_name,</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="st">              SQRT((a.lat - b.lat) ** 2 + (a.lon - b.lon) ** 2) as dist,</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM airports a</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="st">            CROSS JOIN airports b</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="st">            WHERE dist &gt; 0"</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="fu">dbExecute</span>(conn, query)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 1573770</code></pre>
 </div>
@@ -438,24 +531,24 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="check-if-computed-distance-matches-distance-in-data">Check if computed distance matches distance in data</h3>
 <p>I checked the computed distance (<code>dist</code>) against the distance given in the <code>flights</code> table:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="st">  SELECT distance, dist </span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="st">  FROM flights a</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="st">  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="st">  "</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>distance_df <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(conn, query)</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_bw</span>() <span class="sc">+</span> <span class="fu">theme</span>(<span class="at">panel.grid =</span> <span class="fu">element_blank</span>()))</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(distance_df, <span class="fu">aes</span>(dist, distance)) <span class="sc">+</span></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Computed distance"</span>, <span class="at">y =</span> <span class="st">"Provided distance (flights data set)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="st">  SELECT distance, dist </span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="st">  FROM flights a</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="st">  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="st">  "</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>distance_df <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(conn, query)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_bw</span>() <span class="sc">+</span> <span class="fu">theme</span>(<span class="at">panel.grid =</span> <span class="fu">element_blank</span>()))</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(distance_df, <span class="fu">aes</span>(dist, distance)) <span class="sc">+</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Computed distance"</span>, <span class="at">y =</span> <span class="st">"Provided distance (flights data set)"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="index_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -465,7 +558,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="print-the-top-5-longest-flight-paths" class="level3">
 <h3 class="anchored" data-anchor-id="print-the-top-5-longest-flight-paths">Print the top 5 longest flight paths</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">dbGetQuery</span>(conn, <span class="st">"SELECT * FROM distances ORDER BY -dist LIMIT 5"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">dbGetQuery</span>(conn, <span class="st">"SELECT * FROM distances ORDER BY -dist LIMIT 5"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
 <thead>
@@ -479,31 +572,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">SYA</td>
 <td style="text-align: left;">ADK</td>
-<td style="text-align: left;">Eareckson Air Station</td>
+<td style="text-align: left;">SYA</td>
 <td style="text-align: left;">Adak Airport</td>
+<td style="text-align: left;">Eareckson Air Station</td>
 <td style="text-align: right;">350.7610</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">ADK</td>
 <td style="text-align: left;">SYA</td>
-<td style="text-align: left;">Adak Airport</td>
+<td style="text-align: left;">ADK</td>
 <td style="text-align: left;">Eareckson Air Station</td>
+<td style="text-align: left;">Adak Airport</td>
 <td style="text-align: right;">350.7610</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">SYA</td>
 <td style="text-align: left;">AKB</td>
-<td style="text-align: left;">Eareckson Air Station</td>
+<td style="text-align: left;">SYA</td>
 <td style="text-align: left;">Atka Airport</td>
+<td style="text-align: left;">Eareckson Air Station</td>
 <td style="text-align: right;">348.3203</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">AKB</td>
 <td style="text-align: left;">SYA</td>
-<td style="text-align: left;">Atka Airport</td>
+<td style="text-align: left;">AKB</td>
 <td style="text-align: left;">Eareckson Air Station</td>
+<td style="text-align: left;">Atka Airport</td>
 <td style="text-align: right;">348.3203</td>
 </tr>
 <tr class="odd">
@@ -521,7 +614,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="print-the-top-5-shortest-flight-paths" class="level3">
 <h3 class="anchored" data-anchor-id="print-the-top-5-shortest-flight-paths">Print the top 5 shortest flight paths</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">dbGetQuery</span>(conn, <span class="st">"SELECT * FROM distances ORDER BY dist LIMIT 5"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">dbGetQuery</span>(conn, <span class="st">"SELECT * FROM distances ORDER BY dist LIMIT 5"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
 <colgroup>
@@ -542,38 +635,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">BIF</td>
-<td style="text-align: left;">ELP</td>
-<td style="text-align: left;">Biggs Army Air Field (Fort Bliss)</td>
-<td style="text-align: left;">El Paso International Airport</td>
-<td style="text-align: right;">0.0423484</td>
-</tr>
-<tr class="even">
 <td style="text-align: left;">ELP</td>
 <td style="text-align: left;">BIF</td>
 <td style="text-align: left;">El Paso International Airport</td>
 <td style="text-align: left;">Biggs Army Air Field (Fort Bliss)</td>
 <td style="text-align: right;">0.0423484</td>
 </tr>
+<tr class="even">
+<td style="text-align: left;">BIF</td>
+<td style="text-align: left;">ELP</td>
+<td style="text-align: left;">Biggs Army Air Field (Fort Bliss)</td>
+<td style="text-align: left;">El Paso International Airport</td>
+<td style="text-align: right;">0.0423484</td>
+</tr>
 <tr class="odd">
-<td style="text-align: left;">NZY</td>
 <td style="text-align: left;">SAN</td>
-<td style="text-align: left;">North Island Naval Air Station-Halsey Field</td>
+<td style="text-align: left;">NZY</td>
 <td style="text-align: left;">San Diego International Airport</td>
+<td style="text-align: left;">North Island Naval Air Station-Halsey Field</td>
 <td style="text-align: right;">0.0425220</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">SAN</td>
 <td style="text-align: left;">NZY</td>
-<td style="text-align: left;">San Diego International Airport</td>
+<td style="text-align: left;">SAN</td>
 <td style="text-align: left;">North Island Naval Air Station-Halsey Field</td>
+<td style="text-align: left;">San Diego International Airport</td>
 <td style="text-align: right;">0.0425220</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">MRI</td>
 <td style="text-align: left;">EDF</td>
-<td style="text-align: left;">Merrill Field</td>
+<td style="text-align: left;">MRI</td>
 <td style="text-align: left;">Elmendorf Air Force Base</td>
+<td style="text-align: left;">Merrill Field</td>
 <td style="text-align: right;">0.0526706</td>
 </tr>
 </tbody>
@@ -585,66 +678,66 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="relationship-between-average-departure-delay-and-flight-path-distance">Relationship between average departure delay and flight path distance</h3>
 <p>I wanted to investigate whether there was a relationship between average departure delay and (approximate) distance between the origin and destination airports. I obtained the appropriate data by running the following query:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="st">  SELECT a.origin, a.dest, dist, count, avg_dep_delay </span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="st">  FROM </span></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="st">    (SELECT origin, dest, COUNT(*) as count, AVG(dep_delay) as avg_dep_delay</span></span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM flights</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="st">    GROUP BY origin, dest</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="st">    ORDER BY -avg_dep_delay</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="st">  ) a</span></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="st">  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest</span></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>delay_by_distance <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(conn, query)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>query <span class="ot">&lt;-</span> <span class="st">"</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="st">  SELECT a.origin, a.dest, dist, count, avg_dep_delay </span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="st">  FROM </span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="st">    (SELECT origin, dest, COUNT(*) as count, AVG(dep_delay) as avg_dep_delay</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="st">    FROM flights</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="st">    GROUP BY origin, dest</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="st">    ORDER BY -avg_dep_delay</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="st">  ) a</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="st">  JOIN distances b ON a.origin = b.origin AND a.dest = b.dest</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="st">"</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>delay_by_distance <span class="ot">&lt;-</span> <span class="fu">dbGetQuery</span>(conn, query)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To investigate the relationship between distance and average departure delay, I plotted the data as a scatterplot using the <code>ggplot</code> package. I also computed a custom smoothed weighted regression fit (using the number of flights as the weighting variable) and plotted that as well (the corresponding R code can be displayed by clicking the link below):</p>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>delay_by_distance<span class="sc">$</span>flight <span class="ot">&lt;-</span> <span class="fu">with</span>(delay_by_distance, <span class="fu">paste</span>(origin, dest, <span class="at">sep =</span> <span class="st">"-"</span>))</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>outlier1 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, dist <span class="sc">&gt;</span> <span class="dv">75</span> <span class="sc">&amp;</span> avg_dep_delay <span class="sc">&gt;</span> <span class="dv">25</span>)</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>outlier2 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, avg_dep_delay <span class="sc">&gt;</span> <span class="dv">55</span>)</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>outlier3 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, dist <span class="sc">&gt;</span> <span class="dv">75</span> <span class="sc">&amp;</span> avg_dep_delay <span class="sc">&lt;</span> <span class="dv">15</span>)</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>design_matrix <span class="ot">&lt;-</span> <span class="cf">function</span>(x, knots, bandwidth) {</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">outer</span>(x, knots, <span class="st">'-'</span>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="dv">1</span>, <span class="fu">exp</span>(<span class="sc">-</span> (X<span class="sc">^</span><span class="dv">2</span>) <span class="sc">/</span> bandwidth <span class="sc">^</span> <span class="dv">2</span>))</span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">colnames</span>(X) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"X"</span>, <span class="dv">1</span><span class="sc">:</span><span class="fu">ncol</span>(X))</span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  X</span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>bwd <span class="ot">&lt;-</span> <span class="dv">50</span></span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>n_knots <span class="ot">&lt;-</span> <span class="dv">4</span></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>dist <span class="ot">&lt;-</span> delay_by_distance<span class="sc">$</span>dist</span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>knots <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(dist), <span class="fu">max</span>(dist), <span class="at">length =</span> n_knots)</span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">design_matrix</span>(dist, knots, bwd)</span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">subset</span>(delay_by_distance, <span class="at">select =</span> <span class="fu">c</span>(<span class="st">"avg_dep_delay"</span>, <span class="st">"count"</span>)), X)</span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm</span>(avg_dep_delay <span class="sc">~</span> . <span class="sc">-</span> <span class="dv">1</span>, <span class="at">weights =</span> count, <span class="at">data =</span> df)</span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>new_dist <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(dist), <span class="fu">max</span>(dist), <span class="at">length =</span> <span class="dv">100</span>)</span>
-<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>new_X <span class="ot">&lt;-</span> <span class="fu">design_matrix</span>(new_dist, knots, bwd)</span>
-<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>new_df <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">data.frame</span>(<span class="at">count =</span> <span class="dv">1</span>), new_X)</span>
-<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>preds <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit, <span class="at">newdata =</span> new_df)</span>
-<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>pred_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">dist =</span> new_dist, preds)</span>
-<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(delay_by_distance, <span class="fu">aes</span>(dist, avg_dep_delay, <span class="at">label =</span> flight)) <span class="sc">+</span></span>
-<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">size =</span> count)) <span class="sc">+</span></span>
-<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">data =</span> pred_df, <span class="fu">aes</span>(<span class="at">y =</span> preds, <span class="at">label =</span> <span class="cn">NULL</span>), <span class="at">col =</span> <span class="st">"steelblue"</span>) <span class="sc">+</span></span>
-<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier1, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>, <span class="at">hjust =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier2, <span class="at">hjust =</span> <span class="dv">1</span>, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier3, <span class="at">hjust =</span> <span class="dv">1</span>, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size_continuous</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">3</span>)) <span class="sc">+</span></span>
-<span id="cb13-37"><a href="#cb13-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Approximate distance"</span>, <span class="at">y =</span> <span class="st">"Average departure delay"</span>,</span>
-<span id="cb13-38"><a href="#cb13-38" aria-hidden="true" tabindex="-1"></a>       <span class="at">title =</span> <span class="st">"Short flights tended to have smaller delays"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>delay_by_distance<span class="sc">$</span>flight <span class="ot">&lt;-</span> <span class="fu">with</span>(delay_by_distance, <span class="fu">paste</span>(origin, dest, <span class="at">sep =</span> <span class="st">"-"</span>))</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>outlier1 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, dist <span class="sc">&gt;</span> <span class="dv">75</span> <span class="sc">&amp;</span> avg_dep_delay <span class="sc">&gt;</span> <span class="dv">25</span>)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>outlier2 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, avg_dep_delay <span class="sc">&gt;</span> <span class="dv">55</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>outlier3 <span class="ot">&lt;-</span> <span class="fu">subset</span>(delay_by_distance, dist <span class="sc">&gt;</span> <span class="dv">75</span> <span class="sc">&amp;</span> avg_dep_delay <span class="sc">&lt;</span> <span class="dv">15</span>)</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>design_matrix <span class="ot">&lt;-</span> <span class="cf">function</span>(x, knots, bandwidth) {</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">outer</span>(x, knots, <span class="st">'-'</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  X <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="dv">1</span>, <span class="fu">exp</span>(<span class="sc">-</span> (X<span class="sc">^</span><span class="dv">2</span>) <span class="sc">/</span> bandwidth <span class="sc">^</span> <span class="dv">2</span>))</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">colnames</span>(X) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"X"</span>, <span class="dv">1</span><span class="sc">:</span><span class="fu">ncol</span>(X))</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  X</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>bwd <span class="ot">&lt;-</span> <span class="dv">50</span></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>n_knots <span class="ot">&lt;-</span> <span class="dv">4</span></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>dist <span class="ot">&lt;-</span> delay_by_distance<span class="sc">$</span>dist</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>knots <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(dist), <span class="fu">max</span>(dist), <span class="at">length =</span> n_knots)</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> <span class="fu">design_matrix</span>(dist, knots, bwd)</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">subset</span>(delay_by_distance, <span class="at">select =</span> <span class="fu">c</span>(<span class="st">"avg_dep_delay"</span>, <span class="st">"count"</span>)), X)</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>fit <span class="ot">&lt;-</span> <span class="fu">lm</span>(avg_dep_delay <span class="sc">~</span> . <span class="sc">-</span> <span class="dv">1</span>, <span class="at">weights =</span> count, <span class="at">data =</span> df)</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>new_dist <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(dist), <span class="fu">max</span>(dist), <span class="at">length =</span> <span class="dv">100</span>)</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>new_X <span class="ot">&lt;-</span> <span class="fu">design_matrix</span>(new_dist, knots, bwd)</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>new_df <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">data.frame</span>(<span class="at">count =</span> <span class="dv">1</span>), new_X)</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>preds <span class="ot">&lt;-</span> <span class="fu">predict</span>(fit, <span class="at">newdata =</span> new_df)</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>pred_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">dist =</span> new_dist, preds)</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(delay_by_distance, <span class="fu">aes</span>(dist, avg_dep_delay, <span class="at">label =</span> flight)) <span class="sc">+</span></span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">size =</span> count)) <span class="sc">+</span></span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">data =</span> pred_df, <span class="fu">aes</span>(<span class="at">y =</span> preds, <span class="at">label =</span> <span class="cn">NULL</span>), <span class="at">col =</span> <span class="st">"steelblue"</span>) <span class="sc">+</span></span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier1, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>, <span class="at">hjust =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier2, <span class="at">hjust =</span> <span class="dv">1</span>, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb14-35"><a href="#cb14-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="at">data =</span> outlier3, <span class="at">hjust =</span> <span class="dv">1</span>, <span class="at">nudge_x =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb14-36"><a href="#cb14-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size_continuous</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">3</span>)) <span class="sc">+</span></span>
+<span id="cb14-37"><a href="#cb14-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Approximate distance"</span>, <span class="at">y =</span> <span class="st">"Average departure delay"</span>,</span>
+<span id="cb14-38"><a href="#cb14-38" aria-hidden="true" tabindex="-1"></a>       <span class="at">title =</span> <span class="st">"Short flights tended to have smaller delays"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="index_files/figure-html/unnamed-chunk-11-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="index_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>

@@ -16,7 +16,6 @@ As the data to explore, I picked the open-source `nycflights23` data set (includ
 #| message: false
 #| warning: false
 library(duckdb)
-library(nycflights23)
 
 # Create a temporary in-memory duckdb instance
 conn <- dbConnect(duckdb())
@@ -68,6 +67,26 @@ query <- "
   GROUP BY carrier
   ORDER BY -avg_arr_delay
   LIMIT 3"
+
+knitr::kable(dbGetQuery(conn, query))
+```
+
+## Shortest flights as a proportion of the median flight for a given flightpath (window functions)
+
+```{r}
+query <- "
+  SELECT  flightpath,
+          time,
+          MEDIAN(time) OVER (PARTITION BY flightpath) as median_time,
+          time / MEDIAN(time) OVER (PARTITION BY flightpath) as pct_time,
+  FROM (
+        SELECT DISTINCT
+                        hour * 60 + minute as time, 
+                        CONCAT(origin, dest) as flightpath,
+        FROM flights
+        )
+  ORDER BY pct_time
+  LIMIT 10"
 
 knitr::kable(dbGetQuery(conn, query))
 ```
